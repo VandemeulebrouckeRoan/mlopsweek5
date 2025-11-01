@@ -16,11 +16,18 @@ jobs:
 
       # ✅ Build Docker image
       - name: Build Docker image
-        run: docker build -t hello-world-nginx:v1 .
+        run: |
+          IMAGE_NAME=hello-world-nginx
+          TAG="${{ github.ref_name }}-${{ github.sha }}"
+          echo "Using tag: $TAG"
+          docker build -t $IMAGE_NAME:$TAG .
 
       # ✅ Run Docker container for testing
       - name: Run Docker container
         run: |
-          docker run -d -p 8080:80 --name test-container hello-world-nginx:v1
+          IMAGE_NAME=hello-world-nginx
+          TAG="${{ github.ref_name }}-${{ github.sha }}"
+          echo "Running: $IMAGE_NAME:$TAG"
+          docker run -d -p 8080:80 --name test-container $IMAGE_NAME:$TAG
           sleep 5
           curl -I http://localhost:8080
