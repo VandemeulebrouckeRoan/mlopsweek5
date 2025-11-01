@@ -8,47 +8,58 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Check out code repository
-        uses: actions/checkout@v4
+    # ✅ Checkout repo
+    - name: Check out code repository
+      uses: actions/checkout@v4
 
-      - name: Print Hello
-        shell: powershell
-        run: echo "Pipeline running ✅ on SELF-HOSTED runner!"
+    # ✅ Test runner
+    - name: Print Hello
+      shell: powershell
+      run: echo "Pipeline running ✅ on SELF-HOSTED runner!"
 
-      - name: Login to GHCR
-        shell: powershell
-        run: |
-          $token = "${{ secrets.GITHUB_TOKEN }}"
-          docker login ghcr.io -u "${{ github.actor }}" --password $token
+    # ✅ Login to GitHub Container Registry
+    - name: Login to GHCR
+      shell: powershell
+      run: |
+        # Disable credential helper for Docker in this session
+        Set-Content "$HOME/.docker/config.json" '{ "credsStore": "" }'
+        
+        $token = "${{ secrets.GITHUB_TOKEN }}"
+        $user = "${{ github.actor }}"
 
-      - name: Build Docker image
-        shell: powershell
-        run: |
-          $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
-          $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-          echo "Building $IMAGE_NAME:$TAG"
-          docker build -t "$IMAGE_NAME:$TAG" .
+        $token | docker login ghcr.io -u $user --password-stdin
 
-      - name: Push Docker image
-        shell: powershell
-        run: |
-          $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
-          $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-          echo "Pushing $IMAGE_NAME:$TAG"
-          docker push "$IMAGE_NAME:$TAG"
+    # ✅ Build Docker image
+    - name: Build Docker image
+      shell: powershell
+      run: |
+        $IMAGE_NAME="hello-world-nginx"
+        $TAG="${{ github.ref_name }}-${{ github.sha }}"
+        echo "Building $IMAGE_NAME:$TAG"
+        docker build -t ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$TAG .
 
-      - name: Run Docker container
-        shell: powershell
-        run: |
-          $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
-          $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-          echo "Running $IMAGE_NAME:$TAG"
-          docker run -d -p 8080:80 --name test-container "$IMAGE_NAME:$TAG"
-          Start-Sleep -Seconds 5
-          Invoke-WebRequest http://localhost:8080
+    # ✅ Push Docker image
+    - name: Push Docker image
+      shell: powershell
+      run: |
+        $IMAGE_NAME="hello-world-nginx"
+        $TAG="${{ github.ref_name }}-${{ github.sha }}"
+        echo "Pushing $IMAGE_NAME:$TAG"
+        docker push ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$TAG
 
-      - name: Cleanup Docker
-        shell: powershell
-        run: |
-          docker stop test-container
-          docker rm test-container
+    # ✅ Run container to test
+    - name: Run Docker container
+      shell: powershell
+      run: |
+        $IMAGE_NAME="hello-world-nginx"
+        $TAG="${{ github.ref_name }}-${{ github.sha }}"
+        docker run -d -p 8080:80 --name test-container ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$TAG
+        sleep 5
+        Invoke-WebRequest -Uri http://localhost:8080 | Select-Object StatusCode
+
+    # ✅ Cleanup container
+    - name: Cleanup Docker
+      shell: powershell
+      run: |
+        docker stop test-container
+        docker rm test-container
