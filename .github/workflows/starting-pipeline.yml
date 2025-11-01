@@ -5,7 +5,7 @@ on:
 
 jobs:
   first-pipeline:
-    runs-on: self-hosted  # your PC_ROAN runner
+    runs-on: self-hosted
 
     steps:
       - name: Check out code repository
@@ -14,7 +14,6 @@ jobs:
       - name: Print Hello
         run: echo "Pipeline is running ✅"
 
-      # ✅ Build Docker image with Windows PowerShell syntax
       - name: Build Docker image
         shell: powershell
         run: |
@@ -23,18 +22,16 @@ jobs:
           echo "Using tag $TAG"
           docker build -t "$IMAGE_NAME`:$TAG" .
 
-      # ✅ Run Docker container for testing
       - name: Run Docker container
         shell: powershell
         run: |
           $IMAGE_NAME = "hello-world-nginx"
           $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-          echo "Running $IMAGE_NAME:$TAG"
+          echo "Running $IMAGE_NAME`:$TAG"
           docker run -d -p 8080:80 --name test-container "$IMAGE_NAME`:$TAG"
           Start-Sleep -Seconds 5
           curl -I http://localhost:8080
 
-      # ✅ Cleanup container
       - name: Cleanup Docker
         shell: powershell
         run: |
