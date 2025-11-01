@@ -5,12 +5,22 @@ on:
 
 jobs:
   first-pipeline:
-    # We will just use a machine that GitHub provides
-    runs-on: ubuntu-latest  # Best to specify latest stable image
+    runs-on: ubuntu-latest
+
     steps:
-      # Make sure we can access our codebase
       - name: Check out code repository
         uses: actions/checkout@v4
 
       - name: Print Hello
         run: echo "Pipeline is running ✅"
+
+      # ✅ Build Docker image
+      - name: Build Docker image
+        run: docker build -t hello-world-nginx:v1 .
+
+      # ✅ Run Docker container for testing
+      - name: Run Docker container
+        run: |
+          docker run -d -p 8080:80 --name test-container hello-world-nginx:v1
+          sleep 5
+          curl -I http://localhost:8080
