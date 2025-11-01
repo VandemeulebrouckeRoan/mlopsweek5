@@ -1,4 +1,4 @@
-name: Test Kubernetes pipeline
+name: Deploy Pod to Kubernetes
 
 on:
   workflow_dispatch:
@@ -8,8 +8,22 @@ jobs:
     runs-on: self-hosted
 
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Verify kubectl version
-      run: kubectl version --client
+    - name: Generate random ID
+      id: rnd
+      run: |
+        RANDOM_ID=$(date +%s)
+        echo "RANDOM_ID=$RANDOM_ID" >> $GITHUB_ENV
+
+    - name: Create Final Pod File
+      run: |
+        sed "s/{ID}/${RANDOM_ID}/g" pod-template.yml > pod.yml
+        echo "Generated pod name: mypod-${RANDOM_ID}"
+
+    - name: Apply Pod to Kubernetes
+      run: kubectl apply -f pod.yml
+
+    - name: Verify Pods
+      run: kubectl get pods
