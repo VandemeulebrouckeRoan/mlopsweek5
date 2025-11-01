@@ -1,65 +1,60 @@
-name: Starting Pipeline
+name: first-pipeline
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ "main" ]
 
 jobs:
-  first-pipeline:
+  build-push-run:
     runs-on: self-hosted
 
     steps:
-    # ✅ Checkout repo
-    - name: Check out code repository
-      uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-    # ✅ Test runner
     - name: Print Hello
-      shell: powershell
       run: echo "Pipeline running ✅ on SELF-HOSTED runner!"
 
-    # ✅ Login to GitHub Container Registry
+    # --- FIX DOCKER LOGIN ON WINDOWS ---
+    - name: Disable Docker credential helper on Windows
+      shell: pwsh
+      run: |
+        mkdir -Force $HOME\.docker
+        '{"credsStore":""}' | Set-Content "$HOME\.docker\config.json"
+
     - name: Login to GHCR
-      shell: powershell
+      shell: bash
+      env:
+        GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+        GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
       run: |
-        # Disable credential helper for Docker in this session
-        Set-Content "$HOME/.docker/config.json" '{ "credsStore": "" }'
-        
-        $token = "${{ secrets.GITHUB_TOKEN }}"
-        $user = "${{ github.actor }}"
+        echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-        $token | docker login ghcr.io -u $user --password-stdin
+    - name: Set variables
+      run: |
+        echo "IMAGE_NAME=hello-world-nginx" >> $GITHUB_ENV
+        echo "TAG=$(echo ${GITHUB_SHA::8})" >> $GITHUB_ENV
+      shell: bash
 
-    # ✅ Build Docker image
     - name: Build Docker image
-      shell: powershell
+      shell: bash
       run: |
-        $IMAGE_NAME="hello-world-nginx"
-        $TAG="${{ github.ref_name }}-${{ github.sha }}"
-        echo "Building $IMAGE_NAME:$TAG"
-        docker build -t ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$TAG .
+        docker build -t ghcr.io/${{ secrets.GHCR_USERNAME }}/$IMAGE_NAME:$TAG .
 
-    # ✅ Push Docker image
-    - name: Push Docker image
-      shell: powershell
+    - name: Push Docker image to GHCR
+      shell: bash
       run: |
-        $IMAGE_NAME="hello-world-nginx"
-        $TAG="${{ github.ref_name }}-${{ github.sha }}"
-        echo "Pushing $IMAGE_NAME:$TAG"
-        docker push ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$TAG
+        docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/$IMAGE_NAME:$TAG
 
-    # ✅ Run container to test
     - name: Run Docker container
-      shell: powershell
+      shell: bash
       run: |
-        $IMAGE_NAME="hello-world-nginx"
-        $TAG="${{ github.ref_name }}-${{ github.sha }}"
-        docker run -d -p 8080:80 --name test-container ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$TAG
-        sleep 5
-        Invoke-WebRequest -Uri http://localhost:8080 | Select-Object StatusCode
+        docker run -d --rm -p 8080:80 --name test ghcr.io/${{ secrets.GHCR_USERNAME }}/$IMAGE_NAME:$TAG
+        sleep 3
+        curl -I http://localhost:8080
 
-    # ✅ Cleanup container
-    - name: Cleanup Docker
-      shell: powershell
+    - name: Cleanup container
+      shell: bash
       run: |
-        docker stop test-container
-        docker rm test-container
+        docker stop test || true
