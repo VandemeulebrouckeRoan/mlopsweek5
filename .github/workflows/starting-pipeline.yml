@@ -1,0 +1,16 @@
+name: Starting Pipeline
+
+on:
+  workflow_dispatch:
+
+jobs:
+  first-pipeline:
+    # We will just use a machine that GitHub provides
+    runs-on: ubuntu-latest  # Best to specify latest stable image
+    steps:
+      # Make sure we can access our codebase
+      - name: Check out code repository
+        uses: actions/checkout@v4
+
+      - name: Print Hello
+        run: echo "Pipeline is running ✅"
