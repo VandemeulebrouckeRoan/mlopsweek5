@@ -8,54 +8,47 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # ✅ Pull repo
       - name: Check out code repository
         uses: actions/checkout@v4
 
-      # ✅ Confirm pipeline runs on your PC
       - name: Print Hello
-        shell: pwsh
+        shell: powershell
         run: echo "Pipeline running ✅ on SELF-HOSTED runner!"
 
-      # ✅ Login to GHCR
       - name: Login to GHCR
-        shell: pwsh
+        shell: powershell
         run: |
           $token = "${{ secrets.GITHUB_TOKEN }}"
           docker login ghcr.io -u "${{ github.actor }}" --password $token
 
-      # ✅ Build Docker image
       - name: Build Docker image
-        shell: pwsh
+        shell: powershell
         run: |
           $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
           $TAG = "${{ github.ref_name }}-${{ github.sha }}"
           echo "Building $IMAGE_NAME:$TAG"
           docker build -t "$IMAGE_NAME:$TAG" .
 
-      # ✅ Push to GHCR
       - name: Push Docker image
-        shell: pwsh
+        shell: powershell
         run: |
           $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
           $TAG = "${{ github.ref_name }}-${{ github.sha }}"
           echo "Pushing $IMAGE_NAME:$TAG"
           docker push "$IMAGE_NAME:$TAG"
 
-      # ✅ Run container test
       - name: Run Docker container
-        shell: pwsh
+        shell: powershell
         run: |
           $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
           $TAG = "${{ github.ref_name }}-${{ github.sha }}"
           echo "Running $IMAGE_NAME:$TAG"
           docker run -d -p 8080:80 --name test-container "$IMAGE_NAME:$TAG"
           Start-Sleep -Seconds 5
-          Invoke-WebRequest -Uri http://localhost:8080
+          Invoke-WebRequest http://localhost:8080
 
-      # ✅ Cleanup container
       - name: Cleanup Docker
-        shell: pwsh
+        shell: powershell
         run: |
           docker stop test-container
           docker rm test-container
