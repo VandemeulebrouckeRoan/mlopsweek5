@@ -7,58 +7,55 @@ jobs:
   first-pipeline:
     runs-on: self-hosted
 
-    permissions:
-      contents: read
-      packages: write   # ✅ Needed for GHCR
-
     steps:
+      # ✅ Pull repo
       - name: Check out code repository
         uses: actions/checkout@v4
 
+      # ✅ Confirm pipeline runs on your PC
       - name: Print Hello
-        shell: powershell
-        run: echo "Pipeline is running ✅"
+        shell: pwsh
+        run: echo "Pipeline running ✅ on SELF-HOSTED runner!"
 
+      # ✅ Login to GHCR
       - name: Login to GHCR
-        shell: bash
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
+        shell: pwsh
+        run: |
+          $token = "${{ secrets.GITHUB_TOKEN }}"
+          docker login ghcr.io -u "${{ github.actor }}" --password $token
 
       # ✅ Build Docker image
       - name: Build Docker image
-        shell: powershell
+        shell: pwsh
         run: |
-          $IMAGE_NAME = "hello-world-nginx"
+          $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
           $TAG = "${{ github.ref_name }}-${{ github.sha }}"
+          echo "Building $IMAGE_NAME:$TAG"
+          docker build -t "$IMAGE_NAME:$TAG" .
 
-          echo "Building $IMAGE_NAME`:$TAG"
-          docker build -t ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME`:$TAG .
-
-      # ✅ Push Docker image to GHCR
+      # ✅ Push to GHCR
       - name: Push Docker image
-        shell: powershell
+        shell: pwsh
         run: |
-          $IMAGE_NAME = "hello-world-nginx"
+          $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
           $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-          docker push ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME`:$TAG
+          echo "Pushing $IMAGE_NAME:$TAG"
+          docker push "$IMAGE_NAME:$TAG"
 
-      # ✅ Run & Test Container
+      # ✅ Run container test
       - name: Run Docker container
-        shell: powershell
+        shell: pwsh
         run: |
-          $IMAGE_NAME = "hello-world-nginx"
+          $IMAGE_NAME = "ghcr.io/${{ github.actor }}/mlopsweek5"
           $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-          
-          docker ps -aq --filter "name=test-container" | ForEach-Object { docker stop $_; docker rm $_ }
-
-          docker run -d -p 8080:80 --name test-container ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME`:$TAG
+          echo "Running $IMAGE_NAME:$TAG"
+          docker run -d -p 8080:80 --name test-container "$IMAGE_NAME:$TAG"
           Start-Sleep -Seconds 5
+          Invoke-WebRequest -Uri http://localhost:8080
 
-          $resp = Invoke-WebRequest -Uri "http://localhost:8080" -UseBasicParsing
-          if ($resp.StatusCode -ne 200) { exit 1 }
-
+      # ✅ Cleanup container
       - name: Cleanup Docker
-        shell: powershell
+        shell: pwsh
         run: |
           docker stop test-container
           docker rm test-container
