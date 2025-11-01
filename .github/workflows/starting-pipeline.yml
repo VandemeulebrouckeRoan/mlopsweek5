@@ -8,44 +8,56 @@ jobs:
     runs-on: self-hosted
 
     steps:
-    - name: Check out code repository
-      uses: actions/checkout@v4
+      - name: Check out code repository
+        uses: actions/checkout@v4
 
-    - name: Print Hello
-      run: echo "Pipeline is running ✅"
+      - name: Print Hello
+        shell: powershell
+        run: echo "Pipeline is running ✅"
 
-    # ✅ Build Docker image
-    - name: Build Docker image
-      shell: powershell
-      run: |
-        $IMAGE_NAME = "hello-world-nginx"
-        $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-        echo "Using tag $TAG"
-        
-        docker build -t "$IMAGE_NAME`:$TAG" .
+      # ✅ Build Docker image
+      - name: Build Docker image
+        shell: powershell
+        run: |
+          $IMAGE_NAME = "hello-world-nginx"
+          $TAG = "${{ github.ref_name }}-${{ github.sha }}"
+          echo "Building image $IMAGE_NAME`:$TAG"
+          docker build -t "$IMAGE_NAME`:$TAG" .
 
-    # ✅ Run Docker container & test response
-    - name: Run Docker container
-      shell: powershell
-      run: |
-        $IMAGE_NAME = "hello-world-nginx"
-        $TAG = "${{ github.ref_name }}-${{ github.sha }}"
-        echo "Running $IMAGE_NAME`:$TAG"
+      # ✅ Run Docker container & test
+      - name: Run Docker container
+        shell: powershell
+        run: |
+          $IMAGE_NAME = "hello-world-nginx"
+          $TAG = "${{ github.ref_name }}-${{ github.sha }}"
+          echo "Running $IMAGE_NAME`:$TAG"
 
-        # Stop/remove any existing container on port 8080
-        docker ps -aq --filter "name=test-container" | ForEach-Object { docker stop $_; docker rm $_ }
+          # Stop & remove old test container if exists
+          docker ps -aq --filter "name=test-container" | ForEach-Object { docker stop $_; docker rm $_ }
 
-        docker run -d -p 8080:80 --name test-container "$IMAGE_NAME`:$TAG"
-        Start-Sleep -Seconds 5
+          # Run container
+          docker run -d -p 8080:80 --name test-container "$IMAGE_NAME`:$TAG"
+          Start-Sleep -Seconds 5
 
-        # Request to verify container works
-        Invoke-WebRequest -Uri "http://localhost:8080" -Method Head
-        echo "Container responded ✅"
+          # Test endpoint
+          try {
+            $resp = Invoke-WebRequest -Uri "http://localhost:8080" -UseBasicParsing
+            if ($resp.StatusCode -eq 200) {
+              echo "✅ Container responded OK"
+              exit 0
+            } else {
+              echo "❌ Unexpected response code: $($resp.StatusCode)"
+              exit 1
+            }
+          }
+          catch {
+            echo "❌ Container test failed"
+            exit 1
+          }
 
-    # ✅ Cleanup container after test
-    - name: Cleanup Docker
-      if: always()
-      shell: powershell
-      run: |
-        docker ps -aq --filter "name=test-container" | ForEach-Object { docker stop $_; docker rm $_ }
-        echo "Cleanup complete 🧹"
+      # ✅ Clean up test container
+      - name: Cleanup Docker
+        shell: powershell
+        run: |
+          docker stop test-container
+          docker rm test-container
